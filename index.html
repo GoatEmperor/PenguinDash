@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Penguin Dash</title>
+	<link rel="shortcut icon" type="image/png" href="icon.png">
+	<style>
+		body {
+			background-color: #F6F6F6;
+		}
+		canvas {
+			border: 10px solid Black;
+			background-color: Black;
+			position: absolute;
+			top:0;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			margin:auto;
+		}
+		h1 {
+		    text-align: center;
+			font-family: Arial, Helvetica, sans-serif;
+		}
+		p {
+		    font-size: 80%;
+		    margin:auto;
+		    text-align: center;
+		    color: white;
+			font-family: Arial, Helvetica, sans-serif;
+		}
+		img {
+			display: block;
+			margin-left: auto;
+			margin-right: auto;
+			width: 605px;
+		}
+	</style>
+</head>
+<body>
+	<img src="titleoutline.png" alt="Title" width="600" height="150" id="title">
+	<canvas id="canvas" width="800" height="600"></canvas>
+	<a href="https://pixabay.com/?utm_source=link-attribution&amp;utm_medium=referral&amp;utm_campaign=music&amp;utm_content=6409">Thanks to Pixabay for sounds.</a>
+	<div hidden>
+		<img src="basic.png" alt="Basic" width="500" height="600" id="basic">
+		<img src="rock.png" alt="Basic" width="500" height="600" id="rock">
+		<img src="wall.png" alt="Basic" width="500" height="600" id="wall">
+		<img src="floor.png" alt="Basic" width="500" height="600" id="floor">
+		<img src="fish.png" alt="Basic" width="500" height="600" id="fish">
+		<img src="jetpack.png" alt="Basic" width="500" height="600" id="jetpack">
+		<img src="box.png" alt="Basic" width="500" height="600" id="box">
+		<img src="error.png" alt="Basic" width="500" height="600" id="error">
+		<img src="fan.png" alt="Basic" width="500" height="600" id="fan">
+		<img src="shadow.png" alt="Basic" width="500" height="600" id="shadow">
+	</div>
+	<script>
+		// Initialize
+		const audio = ["break.mp3","jump.mp3","win.mp3","powerup.mp3","lose.mp3"];
+		const winscore = 5684420 // about the width of antarctica in meters 5,684,420
+		var canvas = document.getElementById("canvas");
+		var context = canvas.getContext("2d");
+		var offsetx = 0;
+		var canbedamage = true;
+		var canrun = true;
+		var score = 0;
+		var highscore = 0;
+		var MoveY = 300;
+		var canstart = true;
+		var hardcoremode = false;
+		var framescount = 0;
+
+		// Create a player object
+		var player = {
+			x: 50,
+			y: canvas.height - 100,
+			z: 1, // The units above the ground, 1 = ground level
+			lives: 5,
+			width: 48,
+			height: 36,
+			yspeed: 23,
+			color: "blue",
+			img: document.getElementById("basic"),
+			shadow: document.getElementById("shadow"),
+			textcolor: "black",
+			won: false,
+			timer: 2000,
+			type: 0,
+			draw: function() {
+			
+				// Image
+				context.drawImage(this.shadow, this.x - this.width / 2 * this.z , this.y - this.height / 2 * this.z)
+				context.drawImage(this.img, this.x - this.width / 2 * this.z, this.y - this.height / 2 - 1.5, 90 * this.z, 75 * this.z);
+				
+				// draw debug hitbox
+				if (handle.debugmode === true) {
+					context.fillStyle = this.color;
+					context.fillRect(this.x, this.y, this.width, this.height);
+					context.fillStyle = "#ff6a00"
+					context.font = "12px Arial Black";
+					context.fillText(`${this.type}, ${obstacles.length}, ${powerups.length}`, this.x, this.y);
+					context.fillText(`${this.x}, ${Math.round(this.y * 100) / 100}, ${Math.round(this.z * 100) / 100} `, this.x, this.y + 10);
+					context.fillText(`${this.timer}, ${offsetx}`, this.x, this.y + 20);
+					
+					context.fillStyle = "#eeee00";
+					context.fillRect(this.x + this.width + 70, MoveY + 15, 15, 15);
+					context.fillText(`${MoveY}`, this.x + this.width + 70, MoveY );
+					
+					context.font = "24px Arial Black";
+				}
+				
+				// Text drawing
+				context.fillStyle = this.textcolor;
+				context.fillText("LIVES: " + this.lives, 10, 46);
+				context.fillText("SCORE: " + Math.floor(score) + "m", 10, 6);
+				context.fillText("HIGH SCORE: " + Math.floor(highscore) + "m", 10, 26);
+				context.font = "24px Arial Black";
+				context.textBaseline = "hanging";
+				
+				if (handle.extradebug === true) {
+					context.fillText(framescount, 10, 506);
+					context.fillText("UPF Avg. " + score / framescount, 10, 526); // UPF = Units per frame
+					context.fillText("UPF " + (.1 + handle.clamp(offsetx, 0, 9999999999999)), 10, 546); // Same as offsetx + .1
+				}
+			},
+			damage: function(dg) {
+				this.lives = this.lives - dg
+				if (hardcoremode === true) {
+					offsetx -= 0.1
+				}
+				if (this.lives <= 0) {
+					var Per = Math.floor((score * 100) / winscore)
+					var deathtext = "You died! You travled " + Math.floor(score) + " meters (" + Per + "%) Press ENTER";
+					canrun = false;
+					handle.losescreen(deathtext);
+					handle.play(audio[4]);
+				}
+			},
+			jump: function() {
+				if (this.z === 1) {
+					handle.play(audio[1])
+					this.z += 2
+				}
+			},
+			update: function() {	
+				// Move the player to Y
+				
+				// this.y = handle.mean(this.y, MoveY)
+				this.y = handle.mean(this.y, handle.mean(this.y, handle.mean(this.y, MoveY)));
+				
+				
+				// Increase Score
+				score = score + (.1 + handle.clamp(offsetx, -0.099, 9999999999999)); // .1 is slow, .5 is fast
+				// Level Bounding Box
+				this.z = handle.clamp(this.z / 1.01, 1, 2.5);
+				if (MoveY + this.height > canvas.height) {
+					MoveY = canvas.height - this.height;
+				}
+				if (MoveY + this.height < 0 + this.height) {
+					MoveY = 0;
+				}
+				// Winning
+				if (score >= winscore && this.won === false) {
+					this.won = true;
+					this.type = 0;
+					offsetx = -5;
+					score = "";
+					obstacles = [];
+					handle.play(audio[2]);
+				}
+				if (score >= highscore) {
+					highscore = score
+				}
+				// PowerUp Types
+				if (this.type === 1) {
+					this.timer -= 7;
+					if ( !hardcoremode) {
+						offsetx = 15;
+					}
+					this.z = 1.5;
+					this.img = document.getElementById("jetpack");
+					if (this.timer <= 0) {
+						player.type = 0;
+						if ( !hardcoremode) {
+							offsetx = 0;
+						}
+						this.timer = 2000;
+						this.img = document.getElementById("basic");
+					}
+				}
+				if (this.type === 2) {
+					this.timer -= 15;
+					this.z *= 1.0085
+					if (this.timer <= 0) {
+						player.type = 0;
+						this.timer = 2000;
+						this.img = document.getElementById("basic");
+					}
+				}
+			}
+		};
+		
+		
+		// Command Handler
+		var handle = {
+			debugmode: false,
+			extradebug: false,
+			density: 1,
+			debug: function() {
+				this.debugmode = !this.debugmode
+				console.log("Line 1: Type, # obs., # power ups \nLine 2: X pos, Y pos, Z pos \nLine 3: Timer, Offsetx");
+				
+			},
+			soundtest: function() {
+				console.log("if you hear any sound then check your speakers and volume. If that does not work then the sound is bugged")
+				handle.play(audio[2])
+			},
+			sets: function(Speed) {
+				offsetx = Speed
+			},
+			starthardcoremode: function(Lives) {
+			    obstacles = [];
+				offsetx = 5;
+				player.lives = Lives;
+				hardcoremode = true;
+				this.density = 3.3
+			},
+			mean: function(x, y) {
+				return (x + y) / 2
+			},
+			clamp: function(num, min, max) {
+				return num <= min 
+				  ? min 
+				: num >= max 
+				? max 
+				: num
+			},
+			play: function(id) {
+				var audio = new Audio(id);
+				audio.play();
+			},
+			losescreen: function(text) {
+				context.fillText(text, 10, 66);
+			},
+		};
+		
+		var walls = {
+			scroll: 0,
+			color: "red",
+			width: 800,
+			height: 50,
+			img: document.getElementById("wall"),
+			img2: document.getElementById("floor"),
+			draw: function() {
+				// draw floor
+				context.drawImage(this.img2, this.scroll, 0);
+				this.scroll = this.scroll -= 5 + offsetx
+				if (this.scroll <= -1600) {
+					this.scroll = 0
+				}
+			
+				// draw debug hitbox
+				//context.fillStyle = this.color;
+				//context.fillRect(0, 0, this.width, this.height);
+				//context.fillRect(0, canvas.height - this.height, this.width, this.height);
+				
+				// draw walls
+				//context.drawImage(this.img, 0, 0);
+				//context.drawImage(this.img, 0, canvas.height - this.height);
+				
+			},
+		}
+		
+		// Create an array to hold the obstacles
+		var obstacles = [];
+		var powerups = [];
+
+		// Create a function to generate obstacles
+		function generateObstacle() {
+			var obstacle = {
+				x: canvas.width,
+				y: canvas.height - 50 - Math.random() * (canvas.height - 50),
+				img: document.getElementById("rock"),
+				width: 50,
+				height: 50,
+				draw: function() {			
+					// Image drawing
+					context.drawImage(this.img, this.x, this.y);
+					
+					// draw debug hitbox
+					if (handle.debugmode === true) {
+						context.fillStyle = "#ff3399"
+						context.fillRect(this.x, this.y, this.width, this.height);
+						
+					}
+					
+					if (handle.extradebug === true) {
+						context.strokeStyle = player.color
+						context.beginPath();
+						context.moveTo(this.x + this.width / 2, this.y + player.width / 2);
+						context.lineTo(player.x + player.width / 2, player.y + player.width / 2)
+						context.lineWidth = 3.5;
+						context.stroke();
+						var dis = Math.round(Math.hypot(this.x + this.width / 2 - player.x + player.width / 2, player.x + player.width / 2 - player.width / 2))
+						context.fillStyle = "#ff6a00"
+						context.fillText(dis, this.x, this.y + this.height);
+					}
+				},
+				kill: function() {
+					handle.play(audio[0])
+					this.x -= 1000;
+				},
+				update: function() {
+					this.x -= 5 + offsetx;
+				},
+			};
+	
+			obstacles.push(obstacle);
+			
+		}
+		
+		// Power ups
+		function generatePowerUp() {
+			var PowerUp = {
+				x: canvas.width,
+				y: canvas.height - 50 - Math.random() * (canvas.height - 50),
+				img: document.getElementById("error"),
+				type: Math.round(Math.random() * 2),
+				width: 50,
+				height: 50,
+				draw: function() {	
+					// Image drawing
+					context.drawImage(this.img, this.x, this.y);
+					
+					// draw debug hitbox
+					if (handle.debugmode === true) {
+						context.fillStyle = "#00bb99"
+						context.fillRect(this.x, this.y, this.width, this.height);
+						context.fillStyle = "#ff3399"
+						context.fillText(this.type, this.x, this.y);
+					}
+					
+					if (handle.extradebug === true) {
+						context.strokeStyle = "#00ff00"
+						context.beginPath();
+						context.moveTo(this.x + this.width / 2, this.y + player.width / 2);
+						context.lineTo(player.x + player.width / 2, player.y + player.width / 2)
+						context.lineWidth = 3.5;
+						context.stroke();
+						var dis = Math.round(Math.hypot(this.x + this.width / 2 - player.x + player.width / 2, player.x + player.width / 2 - player.width / 2))
+						context.fillStyle = "##ff6a00"
+						context.fillText(dis, this.x, this.y + this.height);
+					}
+				},
+				kill: function() {
+					handle.play(audio[3])
+					this.x -= 1000;
+				},
+				update: function() {
+					this.x -= 5 + offsetx;
+					if (this.type < 1) {
+						this.img = document.getElementById("fish");
+					}  if (this.type >= 1) {
+						this.img = document.getElementById("box");
+					}  if (this.type >= 2) {
+						this.img = document.getElementById("fan");
+						this.width = 200;
+						this.height = 200;
+					}
+				},
+			};
+
+			powerups.push(PowerUp);		
+			
+		}
+		
+		// Create a function to update the game
+		// player.draw() is called last because the text need to be on top
+		function update() {
+			framescount += 1;
+			context.clearRect(0, 0, canvas.width, canvas.height);
+			walls.draw();
+
+			
+			player.update();
+			
+			if (Math.random() < (1/18 * handle.density)) {
+				generateObstacle();
+			}
+			
+			if (Math.random() < (1/575 * handle.density)) {
+				generatePowerUp();
+			}
+
+			// obstacles
+			for (var i = 0; i < obstacles.length; i++) {
+				var obstacle = obstacles[i];
+
+				obstacle.draw();
+				obstacle.update();
+
+				if (obstacle.x + obstacle.width < 0) {
+					obstacles.splice(i, 1);
+					i--;
+				}
+
+				if (canbedamage === true) {
+				if (player.x < obstacle.x + obstacle.width && player.x + player.width > obstacle.x && player.y < obstacle.y + obstacle.height && player.y + player.height > obstacle.y && player.z == 1) {
+					  // location.reload();
+					  obstacle.kill();
+					  player.damage(1);
+					}
+				}
+			}
+			
+			// Power Ups
+			for (var i = 0; i < powerups.length; i++) {
+				var obstacle = powerups[i];
+
+				obstacle.draw();
+				obstacle.update();
+
+				if (obstacle.x + obstacle.width < 0) {
+					powerups.splice(i, 1);
+					i--;
+				}
+
+				if (canbedamage === true) {
+				if (player.x < obstacle.x + obstacle.width && player.x + player.width > obstacle.x && player.y < obstacle.y + obstacle.height && player.y + player.height > obstacle.y && player.z == 1) {
+						if (obstacle.type === 1) { // Jetpack
+							player.type = 1
+							obstacle.kill();
+						} else if (obstacle.type === 2) { // Fan
+							player.z = 1.5		
+							player.type = 2						
+						} else { // Fish
+							player.damage(-1);
+							obstacle.kill();
+						}
+					}
+				}
+			}
+			player.draw();
+			
+			if (canrun === true) {
+				requestAnimationFrame(update);
+			}
+		}
+
+		// Add event listener for the spacebar to make the player jump
+		document.addEventListener("keydown", function(event) {
+			if (event.keyCode === 80) {
+				handle.starthardcoremode(1);
+			}
+			if (event.keyCode === 38) {
+			    MoveY -= player.yspeed
+			}
+			if (event.keyCode === 40) {
+				MoveY += player.yspeed
+			}
+			if (event.keyCode === 32) {
+			    player.jump()
+			}
+			if (event.keyCode === 13 && canrun === false) {
+				player.lives = 5;
+				score = 0;
+				offsetx = 0;
+				this.lives = 5
+				obstacles = [];
+				canrun = true;
+				requestAnimationFrame(update);
+			}
+			if (event.keyCode === 119) {
+			    handle.debug();
+			}
+			if (event.keyCode === 120) {
+			    handle.extradebug = !handle.extradebug;
+			}
+			if (event.keyCode === 115) {
+			    canrun = false;
+				update();
+			}
+			if (canstart === true) {
+				canstart = false;
+				// Start the game
+				update();
+			}
+		})
+		
+
+	</script>
+</body>
+</html>
