@@ -24,8 +24,6 @@
 		p {
 		    font-size: 80%;
 		    margin:auto;
-		    text-align: center;
-		    color: white;
 			font-family: Arial, Helvetica, sans-serif;
 		}
 		img {
@@ -39,6 +37,7 @@
 <body>
 	<img src="titleoutline.png" alt="Title" width="600" height="150" id="title">
 	<canvas id="canvas" width="800" height="600"></canvas>
+	<p> Press ENTER to load with save data. <br> Press F4 then delete to clear save.</p>
 	<a href="https://pixabay.com/?utm_source=link-attribution&amp;utm_medium=referral&amp;utm_campaign=music&amp;utm_content=6409">Thanks to Pixabay for sounds.</a>
 	<div hidden>
 		<img src="basic.png" alt="Basic" width="500" height="600" id="basic">
@@ -51,10 +50,12 @@
 		<img src="error.png" alt="Basic" width="500" height="600" id="error">
 		<img src="fan.png" alt="Basic" width="500" height="600" id="fan">
 		<img src="shadow.png" alt="Basic" width="500" height="600" id="shadow">
+		<img src="checkpoint.png" alt="Basic" width="500" height="600" id="checkpoint">
 	</div>
 	<script>
 		// Initialize
-		const audio = ["break.mp3","jump.mp3","win.mp3","powerup.mp3","lose.mp3"];
+		console.log("Version 1.1");
+		const audio = ["break.mp3","jump.mp3","win.mp3","powerup.mp3","lose.mp3","savealert.mp3","error.mp3"];
 		const winscore = 5684420 // about the width of antarctica in meters 5,684,420
 		var canvas = document.getElementById("canvas");
 		var context = canvas.getContext("2d");
@@ -67,6 +68,8 @@
 		var canstart = true;
 		var hardcoremode = false;
 		var framescount = 0;
+		var save = ""
+		var lastkey = 0
 
 		// Create a player object
 		var player = {
@@ -110,8 +113,8 @@
 				// Text drawing
 				context.fillStyle = this.textcolor;
 				context.fillText("LIVES: " + this.lives, 10, 46);
-				context.fillText("SCORE: " + Math.floor(score) + "m", 10, 6);
-				context.fillText("HIGH SCORE: " + Math.floor(highscore) + "m", 10, 26);
+				context.fillText("SCORE: " + Math.floor(score).toLocaleString() + "m", 10, 6);
+				context.fillText("HIGH SCORE: " + Math.floor(highscore).toLocaleString() + "m", 10, 26);
 				context.font = "24px Arial Black";
 				context.textBaseline = "hanging";
 				
@@ -127,7 +130,7 @@
 					offsetx -= 0.1
 				}
 				if (this.lives <= 0) {
-					var Per = Math.floor((score * 100) / winscore)
+					var Per = Math.floor((score * 100000) / winscore) / 1000
 					var deathtext = "You died! You travled " + Math.floor(score) + " meters (" + Per + "%) Press ENTER";
 					canrun = false;
 					handle.losescreen(deathtext);
@@ -162,7 +165,7 @@
 					this.won = true;
 					this.type = 0;
 					offsetx = -5;
-					score = "";
+					score = winscore;
 					obstacles = [];
 					handle.play(audio[2]);
 				}
@@ -239,6 +242,24 @@
 			},
 			losescreen: function(text) {
 				context.fillText(text, 10, 66);
+			},
+			savestats: function() {
+				context.fillText("Saved data", 10, 66);
+				localStorage.setItem("gamesave", `${score}@${highscore}@${player.lives}`);
+				console.log(`Saved scores at ${score}, ${highscore}. Lives ${player.lives}`)
+			},
+			loaddata: function() {
+				context.fillText("Loading data", 10, 66);
+				if (!(save == null)) {
+					handle.play(audio[5]);
+					save = save.split("@");
+					score = save[0] * 1;
+					highscore = save[1] * 1;
+					player.lives = save[2] * 1;
+				} else {
+					console.warn("There was no save data")
+					handle.play(audio[6]);
+				}
 			},
 		};
 		
@@ -323,7 +344,8 @@
 				x: canvas.width,
 				y: canvas.height - 50 - Math.random() * (canvas.height - 50),
 				img: document.getElementById("error"),
-				type: Math.round(Math.random() * 2),
+				type: Math.round(Math.random() * 3),
+				color: "#00bb99",
 				width: 50,
 				height: 50,
 				draw: function() {	
@@ -332,7 +354,7 @@
 					
 					// draw debug hitbox
 					if (handle.debugmode === true) {
-						context.fillStyle = "#00bb99"
+						context.fillStyle = this.color
 						context.fillRect(this.x, this.y, this.width, this.height);
 						context.fillStyle = "#ff3399"
 						context.fillText(this.type, this.x, this.y);
@@ -364,6 +386,10 @@
 						this.img = document.getElementById("fan");
 						this.width = 200;
 						this.height = 200;
+					} if (this.type >= 3 ) {
+						this.img = document.getElementById("checkpoint");
+						this.width = 100;
+						this.height = 100;
 					}
 				},
 			};
@@ -373,13 +399,14 @@
 		}
 		
 		// Create a function to update the game
-		// player.draw() is called last because the text need to be on top
+		// player.draw() is called last because the text needs to be on top
 		function update() {
 			framescount += 1;
+			
+			
 			context.clearRect(0, 0, canvas.width, canvas.height);
 			walls.draw();
 
-			
 			player.update();
 			
 			if (Math.random() < (1/18 * handle.density)) {
@@ -389,7 +416,8 @@
 			if (Math.random() < (1/575 * handle.density)) {
 				generatePowerUp();
 			}
-
+			
+			
 			// obstacles
 			for (var i = 0; i < obstacles.length; i++) {
 				var obstacle = obstacles[i];
@@ -430,7 +458,10 @@
 							obstacle.kill();
 						} else if (obstacle.type === 2) { // Fan
 							player.z = 1.5		
-							player.type = 2						
+							player.type = 2
+						} else if (obstacle.type === 3) { // Checkpoint
+							handle.savestats()	
+							obstacle.kill();
 						} else { // Fish
 							player.damage(-1);
 							obstacle.kill();
@@ -478,11 +509,25 @@
 			    canrun = false;
 				update();
 			}
+			if (canstart === true && event.keyCode === 13) {
+				save = localStorage.getItem("gamesave");
+				handle.loaddata()
+			}
+			if (event.keyCode === 115) {
+			    canrun = false;
+				update();
+			}
 			if (canstart === true) {
 				canstart = false;
 				// Start the game
 				update();
 			}
+			if (lastkey === 115 && event.keyCode === 46) {
+				localStorage.removeItem("gamesave");
+				handle.play(audio[6]);
+				window.alert("Deleted game save!")
+			}
+			lastkey = event.keyCode
 		})
 		
 
